@@ -57,6 +57,7 @@ data_check() {
 }
 
 # 认证由网关承担（清单里 TRILIUM_GENERAL_NOAUTHENTICATION）：应用侧没有“当前用户”接口可断言，
-# 主人能打开由 web_assert 和网关对匿名请求的 401 证明。
-IDENTITY_NA=1
-E2E_NOTE="认证按上游选项交给网关（无应用内登录），应用没有用户体系可断言；主人会话能打开应用、网关拒绝匿名请求由网页项证明"
+# 主人能打开由 web_assert 和网关对匿名请求的 401 证明。dev 探针读 SMOKE_NOTE，e2e 读 E2E_NOTE。
+export IDENTITY_NA=1
+export SMOKE_NOTE="认证按上游选项交给网关（无应用内登录），应用没有用户体系可断言；主人会话能打开应用、网关拒绝匿名请求由网页项证明"
+export E2E_NOTE="$SMOKE_NOTE"
