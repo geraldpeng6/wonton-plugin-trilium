@@ -17,10 +17,12 @@ probe_stash() {
 
 web_assert() { grep -q 'Trilium Notes'; }   # 客户端 HTML shell 的 <title>
 
-# Trilium 首次启动后文档还没建，建笔记前先走一次应用自己的设置向导接口（新实例免鉴权；
-# 已建过文档时返回 401 "App already initialized."，重跑幂等）。
+# Trilium 首次启动后文档还没建：先走一次应用自己的设置向导接口（新实例免鉴权；已建过文档时
+# 返回 401 "App already initialized."，重跑幂等），文档建好后 /bootstrap 才会签发 CSRF。
+# /api/* 的 POST 一律要 CSRF（apiRoute 恒加 csrfMiddleware）：GET /bootstrap 领
+# trilium-csrf cookie，再带回请求头。
 data_write() {
-  local jar base stash resp note_id marker
+  local jar base stash resp note_id marker csrf
   jar="$(probe_jar)"; base="$(probe_base)"
   [[ -n "$jar" && -n "$base" ]] || { echo "拿不到会话或网页地址"; return 1; }
 
@@ -32,8 +34,13 @@ data_write() {
     *) echo "建文档返回 $resp"; return 1 ;;
   esac
 
+  resp="$(curl -sS --noproxy '*' -b "$jar" -c "$jar" -o /dev/null -w '%{http_code}' "$base/bootstrap")" ||
+    { echo "取 bootstrap 失败"; return 1; }
+  csrf="$(awk '$6=="trilium-csrf"{print $NF; exit}' "$jar")"
+  [[ -n "$csrf" ]] || { echo "bootstrap 后没有 trilium-csrf cookie（GET /bootstrap 返回 $resp）"; return 1; }
+
   marker="$(head -c12 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-  resp="$(curl -sS --noproxy '*' --fail-with-body -b "$jar" -H 'Content-Type: application/json' \
+  resp="$(curl -sS --noproxy '*' --fail-with-body -b "$jar" -H "X-CSRF-Token: $csrf" -H 'Content-Type: application/json' \
     -d "{\"title\":\"云吞冒烟 $marker\",\"content\":\"<p>云吞冒烟标记 $marker</p>\",\"type\":\"text\"}" \
     "$base/api/notes/root/children?target=into")" || { echo "建笔记失败：$resp"; return 1; }
   note_id="$(jq -r '.note.noteId // empty' <<<"$resp")"
