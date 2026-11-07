@@ -1,78 +1,78 @@
-# 示例插件：nginx 显示一个网页，向登录的人问好。改成自己的应用见 https://github.com/geraldpeng6/wonton-docs/blob/main/develop.md#写插件。
+# Trilium 个人知识库：Node 服务 + SQLite 一体，单容器，数据全在插件数据目录。
+#
+# 认证交给云吞网关（TRILIUM_GENERAL_NOAUTHENTICATION）：插件网络是内部网络，能到 Trilium 的
+# 只有带着主人会话的网关，容器不出网、不开局域网端口。上游文档明确这种场景可以关掉自带认证
+# （docs/User Guide/.../Server Installation/Authentication.md："if authentication is handled by
+# another component"）。不用 sso: oidc：Trilium 的 OIDC 要先在 Options 里把登录方式切到
+# OpenID Connect，再从已登录会话点 Connect account 完成绑定（apps/server/src/services/open_id.ts
+# 的 isOpenIDEnabled 要求 mfaMethod 选项为 oauth 且 subject identifier 已保存），新装实例没有
+# 本地密码可登录，绑定无从发起，装上就会把用户挡在设置向导外。
+#
+# 首次打开是 Trilium 自己的设置向导（新建文档，或从旧实例同步/备份迁移），不做预置、不改数据。
 services:
-  web:
-    # 镜像按摘要固定（多架构镜像写清单列表的摘要），标签只给人看。
-    image: nginx:1.31.7-alpine@sha256:892bb2152464f0c5d8972593a5f5afaf8054552580b699d95f8ff4af08c2d33d
+  trilium:
+    image: triliumnext/trilium:v0.106.1@sha256:d87d810fdcb549db65710a40933acaa16bc75c9426a9164c547f7ba95592941b
+    # 官方入口以 root 起，按 USER_UID/USER_GID 改 node 用户后降权运行（start-docker.sh：
+    # usermod + chown -R /home/node + su）。服务不写 user，核心把数据目录交给 PUID:PGID，正好衔接。
     environment:
-      # 网关代登录：SSI 回显的 Remote-User 只信核心带来的。官方镜像启动时对 templates 目录里的
-      # *.template 做 envsubst，把下面的地址换进 nginx 配置（见 web/default.conf.template）。
-      WONTON_CORE_ADDRESS: ${WONTON_CORE_ADDRESS}
-    # 包里的文件经 configs 交给容器（核心在启动前写进去），不能用卷挂载。
-    configs:
-      - source: site
-        target: /etc/nginx/templates/default.conf.template
-      - source: page
-        target: /usr/share/nginx/html/index.html
-      - source: tokens
-        target: /usr/share/nginx/html/tokens.css
+      TRILIUM_DATA_DIR: /home/node/trilium-data
+      USER_UID: ${PUID}
+      USER_GID: ${PGID}
+      TZ: ${TZ}
+      TRILIUM_GENERAL_NOAUTHENTICATION: "true"
+    volumes:
+      - ${WONTON_APP_DATA}/data:/home/node/trilium-data
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      # /api/health-check 由监听中的服务真实作答（routes.ts 里注册，不带鉴权中间件）；
+      # 镜像自带的 HEALTHCHECK 走同一个端点，这里按官方索引要求在 compose 里显式写出。
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/health-check"]
       interval: 30s
       timeout: 5s
-      start_period: 30s
-      start_interval: 1s
-
-configs:
-  site:
-    file: web/default.conf.template
-  page:
-    file: web/index.html
-  tokens:
-    file: web/tokens.css
+      start_period: 60s
+      start_interval: 2s
 
 x-wonton:
-  spec: "0.5"
-  # 换成你自己的：反向域名形式，装上以后不能改。
-  id: app.example.hello
-  version: 0.1.1
+  spec: "0.6"
+  id: org.triliumnotes.trilium
+  version: 0.1.0
   kind: app
-  title: { zh: 你好, en: Hello }
-  description: { zh: 向登录的人问好的示例网页, en: An example page that greets whoever is signed in }
+  title: { en: Trilium }
+  description:
+    zh: 无限层级的个人知识库，笔记、关系和脚本都存在自己家里
+    en: A personal knowledge base with unlimited note hierarchy, stored at home
   icon: icon.svg
   notices: [NOTICE]
-  screenshots: [screenshots/home.png]
-  author: { name: Example }
-  homepage: https://nginx.org
-  # 应用（这里是 nginx）的许可证；插件包自己的许可证写在仓库的 LICENSE 里。
-  license: BSD-2-Clause
+  screenshots: [screenshots/notes.png, screenshots/tree.png, screenshots/editor.png]
+  author: { name: geraldpeng6, url: https://github.com/geraldpeng6 }
+  homepage: https://triliumnotes.org
+  # Trilium 是 AGPL-3.0；插件包自己的许可证在 LICENSE（MIT）。
+  license: AGPL-3.0-only
   tags:
-    zh: [工具]
-    en: [Tools]
+    zh: [笔记, 知识库]
+    en: [Notes, Knowledge base]
   about:
     zh: |
-      一个示例网页：登录以后，页面会向你问好。新建插件时可以照着改。
+      个人知识库：笔记无限层级嵌套，笔记之间连成网，还有画布、思维导图、代码笔记和内置日历。
+      富文本和 Markdown 都能写，全文搜索随手找，改动留有修订历史。
+
+      数据库和附件都存在自己家里。打开就是自己的库：第一次进去选一下“新建文档”或从旧 Trilium
+      迁移，之后没有应用内登录。要格外保密的笔记可以设“受保护”，单独加一层密码。
     en: |
-      An example page: once you are signed in, the page says hello. Copy it as a starting point for a new plugin.
-  release_notes: { zh: 名字和说明更新。, en: Product name and description update. }
+      A personal knowledge base: notes nest without limit and link into a network, with canvas,
+      mind maps, code notes and a built-in day planner. Write in rich text or Markdown, find
+      anything with full-text search, and every change keeps a revision history.
+
+      The database and attachments stay at home. Opening the page lands you in your own library:
+      the first visit asks you to create a document (or migrate from an old Trilium), and after
+      that there is no in-app sign-in. Notes that need extra secrecy can be marked "protected"
+      with a password of their own.
+  release_notes: { zh: 第一个版本。, en: First release. }
   webui:
-    service: web
-    port: 80
-    # 示例页回显网关注入的用户名，见 https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#网关代登录sso-proxy。
-    sso: proxy
-    proxy:
-      headers:
-        Remote-User: "{user}"
-  # 能放到底栏的页面，见 https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#底栏页面tabs。放不放由用户决定。
-  tabs:
-    - id: home
-      title: { zh: 主页, en: Home }
-      icon: tabs/home.svg
-      icon_selected: tabs/home-fill.svg
-      path: /
-      # 这个页面没做适配，用默认的 inset：页面夹在 App 的栏中间，不会被挡。
-      # 想让内容从栏下滚过，写 layout: edge-to-edge，并用 --wonton-inset-* 留出栏的位置。
+    service: trilium
+    port: 8080
   permissions: []
-  # 上游 nginx 官方镜像，amd64 和 arm64 都有；上游没写最低内存，按本机空闲实测取整（实测约 24M，取 64M）。
+  # 镜像支持 amd64、arm64、armv7；这里声明 amd64 和 arm64。上游没写最低内存，本机空闲实测约
+  # 100M（v0.106.1，单用户空库，docker stats），编辑与同步有尖峰，取 256M。
   requirements:
     arch: [amd64, arm64]
-    memory: 64M
+    memory: 256M
