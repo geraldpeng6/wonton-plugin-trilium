@@ -23,14 +23,14 @@ data_write() {
   [[ -n "$SMOKE_JAR" && -n "$SMOKE_WEB_URL" ]] || { echo "拿不到会话或网页地址"; return 1; }
 
   resp="$(curl -sS --noproxy '*' -b "$SMOKE_JAR" -o /dev/null -w '%{http_code}' \
-    -X POST "$SMOKE_WEB_URL/api/setup/new-document?skipDemoDb")" || { echo "设置向导接口请求失败"; return 1; }
+    -X POST "${SMOKE_WEB_URL%/}/api/setup/new-document?skipDemoDb")" || { echo "设置向导接口请求失败"; return 1; }
   case "$resp" in
     2*) : ;;
     401) : ;;  # 文档已存在（重装/重跑），照常用
     *) echo "建文档返回 $resp"; return 1 ;;
   esac
 
-  resp="$(curl -sS --noproxy '*' -b "$SMOKE_JAR" -c "$SMOKE_JAR" -o /dev/null -w '%{http_code}' "$SMOKE_WEB_URL/bootstrap")" ||
+  resp="$(curl -sS --noproxy '*' -b "$SMOKE_JAR" -c "$SMOKE_JAR" -o /dev/null -w '%{http_code}' "${SMOKE_WEB_URL%/}/bootstrap")" ||
     { echo "取 bootstrap 失败"; return 1; }
   csrf="$(awk '$6=="trilium-csrf"{print $NF; exit}' "$SMOKE_JAR")"
   [[ -n "$csrf" ]] || { echo "bootstrap 后没有 trilium-csrf cookie（GET /bootstrap 返回 $resp）"; return 1; }
@@ -38,7 +38,7 @@ data_write() {
   marker="$(head -c12 /dev/urandom | od -An -tx1 | tr -d ' \n')"
   resp="$(curl -sS --noproxy '*' --fail-with-body -b "$SMOKE_JAR" -H "X-CSRF-Token: $csrf" -H 'Content-Type: application/json' \
     -d "{\"title\":\"云吞冒烟 $marker\",\"content\":\"<p>云吞冒烟标记 $marker</p>\",\"type\":\"text\"}" \
-    "$SMOKE_WEB_URL/api/notes/root/children?target=into")" || { echo "建笔记失败：$resp"; return 1; }
+    "${SMOKE_WEB_URL%/}/api/notes/root/children?target=into")" || { echo "建笔记失败：$resp"; return 1; }
   note_id="$(jq -r '.note.noteId // empty' <<<"$resp")"
   [[ -n "$note_id" ]] || { echo "响应里没有 noteId：$(head -c 200 <<<"$resp")"; return 1; }
   printf 'TRILIUM_PROBE_NOTE_ID=%s\nTRILIUM_PROBE_MARKER=%s\n' "$note_id" "$marker" >"$(marker_file)"
@@ -52,7 +52,7 @@ data_check() {
   marker="$(sed -n 's/^TRILIUM_PROBE_MARKER=//p' "$marker_path")"
   [[ -n "$note_id" && -n "$marker" ]] || { echo "标记文件不完整：$(head -c 120 "$marker_path")"; return 1; }
 
-  resp="$(curl -sS --noproxy '*' --fail-with-body -b "$SMOKE_JAR" "$SMOKE_WEB_URL/api/notes/$note_id")" ||
+  resp="$(curl -sS --noproxy '*' --fail-with-body -b "$SMOKE_JAR" "${SMOKE_WEB_URL%/}/api/notes/$note_id")" ||
     { echo "读不回笔记 $note_id：$resp"; return 1; }
   grep -qF "$marker" <<<"$resp" ||
     { echo "笔记里找不到标记 $marker：$(head -c 200 <<<"$resp")"; return 1; }
