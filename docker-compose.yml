@@ -36,10 +36,10 @@ x-wonton:
   id: org.triliumnotes.trilium
   version: 0.1.0
   kind: app
-  title: { en: Trilium }
+  title: { zh: 树状笔记（Trilium）, en: Note Tree (Trilium) }
   description:
-    zh: 无限层级的个人知识库，笔记、关系和脚本都存在自己家里
-    en: A personal knowledge base with unlimited note hierarchy, stored at home
+    zh: 像一棵能无限展开的笔记树：笔记一层套一层分门别类，也能互相链接、画思维导图。适合喜欢按目录从大到小整理资料的人。
+    en: "A note tree that unfolds as deep as you like: file notes inside notes, link them together and add mind maps. For people who like organizing things folder by folder."
   icon: icon.svg
   notices: [NOTICE]
   screenshots: [screenshots/notes.png, screenshots/tree.png, screenshots/editor.png]
