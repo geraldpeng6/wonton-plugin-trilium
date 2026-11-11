@@ -1,6 +1,6 @@
 # Trilium
 
-开发流程见[插件开发指南](https://github.com/geraldpeng6/wonton-docs/blob/main/develop.md)。
+开发流程见[插件开发指南](https://github.com/wontonapp/wonton-docs/blob/main/develop.md)。
 
 Trilium：个人知识库，笔记无限层级嵌套。这个仓库把上游官方镜像打包成云吞插件，认证交给云吞网关（上游官方选项 `noAuthentication`，见上游 Authentication 文档），打开就是自己的库，没有第二次登录。
 
