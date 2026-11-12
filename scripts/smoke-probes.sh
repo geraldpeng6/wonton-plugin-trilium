@@ -14,9 +14,6 @@ web_assert() { grep -q 'Trilium Notes'; }   # 客户端 HTML shell 的 <title>
 # 返回 401 "App already initialized."，重跑幂等），文档建好后 /bootstrap 才会签发 CSRF。
 # /api/* 的 POST 一律要 CSRF（apiRoute 恒加 csrfMiddleware）：GET /bootstrap 领
 # trilium-csrf cookie，再带回请求头。
-marker_file() { # SMOKE_STATE 在套件里是状态目录（e2e 传的是标记文件本身），标记放对应路径
-  if [[ -d "$SMOKE_STATE" ]]; then printf '%s' "$SMOKE_STATE/trilium-marker"; else printf '%s' "${SMOKE_STATE}.marker"; fi
-}
 
 data_write() {
   local resp note_id marker csrf
@@ -41,12 +38,12 @@ data_write() {
     "${SMOKE_WEB_URL%/}/api/notes/root/children?target=into")" || { echo "建笔记失败：$resp"; return 1; }
   note_id="$(jq -r '.note.noteId // empty' <<<"$resp")"
   [[ -n "$note_id" ]] || { echo "响应里没有 noteId：$(head -c 200 <<<"$resp")"; return 1; }
-  printf 'TRILIUM_PROBE_NOTE_ID=%s\nTRILIUM_PROBE_MARKER=%s\n' "$note_id" "$marker" >"$(marker_file)"
+  printf 'TRILIUM_PROBE_NOTE_ID=%s\nTRILIUM_PROBE_MARKER=%s\n' "$note_id" "$marker" >"$SMOKE_STATE"
 }
 
 data_check() {
   local note_id marker marker_path resp
-  marker_path="$(marker_file)"
+  marker_path="$SMOKE_STATE"
   [[ -s "$marker_path" ]] || { echo "没有数据标记文件 $marker_path"; return 1; }
   note_id="$(sed -n 's/^TRILIUM_PROBE_NOTE_ID=//p' "$marker_path")"
   marker="$(sed -n 's/^TRILIUM_PROBE_MARKER=//p' "$marker_path")"
